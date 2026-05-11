@@ -19,51 +19,81 @@
             min-height: 100vh;
         }
 
+        /* 甜品格子基础样式 */
         .cell {
-            @apply bg-white rounded-xl shadow-md flex items-center justify-center cursor-pointer transition-all duration-200 hover:scale-105;
-            font-size: 26px;
+            @apply bg-white rounded-xl shadow-md flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105;
+            font-size: 28px;
+            position: relative;
         }
 
+        /* 选中高亮 */
         .cell.active {
             @apply border-2 border-pink-400 bg-pink-50 scale-105;
         }
 
-        .cell.clear {
-            animation: cellClear 0.4s ease forwards;
+        /* 消除动画（核心修复） */
+        .cell-clear {
+            animation: clearAnim 0.5s ease-in-out forwards;
         }
 
-        @keyframes cellClear {
+        @keyframes clearAnim {
             0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.2); opacity: 0.6; }
+            50% { transform: scale(1.3); opacity: 0.5; }
             100% { transform: scale(0); opacity: 0; }
         }
 
-        .board {
+        /* 下落动画 */
+        .cell-drop {
+            animation: dropAnim 0.3s ease-in-out;
+        }
+
+        @keyframes dropAnim {
+            0% { transform: translateY(-20px); opacity: 0; }
+            100% { transform: translateY(0); opacity: 1; }
+        }
+
+        /* 提示闪烁动画 */
+        .cell-hint {
+            animation: hintAnim 0.8s infinite alternate;
+            @apply border-yellow-400 border-2;
+        }
+
+        @keyframes hintAnim {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        /* 棋盘布局 */
+        .game-board {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
             grid-template-rows: repeat(6, 1fr);
             gap: 8px;
         }
 
-        .hint-flash {
-            animation: flash 0.8s infinite;
-        }
-
-        @keyframes flash {
-            0%,100% { opacity: 1; }
-            50% { opacity: 0.5; }
+        /* 规则卡片 */
+        .rule-card {
+            @apply bg-white/90 rounded-xl p-3 text-pink-600 text-sm mb-4 shadow-sm max-w-md w-full text-center;
         }
     </style>
 </head>
-<body class="flex flex-col items-center py-8 px-4">
-    <!-- 标题 -->
-    <div class="text-center mb-6">
+<body class="flex flex-col items-center py-6 px-4">
+    <!-- 游戏标题 -->
+    <div class="text-center mb-4">
         <h1 class="text-4xl font-bold text-pink-500 drop-shadow-md mb-2">🍰 小甜消消乐 🍬</h1>
-        <p class="text-pink-600 text-lg">互换甜品，凑3个连成一线即可消除~</p>
+        <p class="text-pink-600 text-lg">甜品三消小游戏</p>
+    </div>
+
+    <!-- 游戏规则（明确展示） -->
+    <div class="rule-card">
+        <p class="font-bold">📜 游戏规则</p>
+        <p>1. 点击<strong>相邻</strong>两个甜品互换位置</p>
+        <p>2. 横向/纵向<strong>凑3个及以上</strong>相同甜品即可消除</p>
+        <p>3. 消除后甜品自动下落，连锁消除得分更高</p>
     </div>
 
     <!-- 信息栏 -->
-    <div class="w-full max-w-md bg-white/80 rounded-xl p-4 mb-6 flex justify-between items-center shadow-sm">
+    <div class="w-full max-w-md bg-white/80 rounded-xl p-4 mb-5 flex justify-between items-center shadow-sm">
         <div class="text-pink-600">
             <span class="font-bold">时间：</span>
             <span id="time" class="text-red-500 text-xl">90</span>s
@@ -75,25 +105,28 @@
     </div>
 
     <!-- 游戏棋盘 -->
-    <div id="gameBoard" class="board w-full max-w-md h-[420px] mb-6"></div>
+    <div id="gameBoard" class="game-board w-full max-w-md h-[420px] mb-6"></div>
 
-    <!-- 按钮 -->
+    <!-- 控制按钮 -->
     <div class="flex gap-4 mb-6">
-        <button id="hintBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white px-6 py-2 rounded-lg shadow transition-all">
+        <button id="ruleBtn" class="bg-blue-400 hover:bg-blue-500 text-white px-5 py-2 rounded-lg shadow transition-all">
+            📜 规则详情
+        </button>
+        <button id="hintBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white px-5 py-2 rounded-lg shadow transition-all">
             💡 提示
         </button>
-        <button id="resetBtn" class="bg-pink-400 hover:bg-pink-500 text-white px-6 py-2 rounded-lg shadow transition-all">
+        <button id="resetBtn" class="bg-pink-400 hover:bg-pink-500 text-white px-5 py-2 rounded-lg shadow transition-all">
             🔄 重置游戏
         </button>
     </div>
 
-    <!-- 弹窗 -->
+    <!-- 通用弹窗 -->
     <div id="modal" class="fixed top-0 left-0 w-full h-full bg-black/50 hidden justify-center items-center z-50">
         <div class="bg-white rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full">
-            <h2 id="modalTitle" class="text-3xl font-bold mb-4"></h2>
+            <h2 id="modalTitle" class="text-3xl font-bold mb-4 text-pink-500"></h2>
             <p id="modalDesc" class="text-gray-600 mb-6 text-lg"></p>
             <button id="modalBtn" class="bg-pink-400 hover:bg-pink-500 text-white px-8 py-3 rounded-lg text-lg">
-                再来一局
+                确定
             </button>
         </div>
     </div>
@@ -114,9 +147,11 @@
         let selected = null;
         let isMoving = false;
 
+        // DOM元素
         const gameBoard = document.getElementById('gameBoard');
         const scoreEl = document.getElementById('score');
         const timeEl = document.getElementById('time');
+        const ruleBtn = document.getElementById('ruleBtn');
         const hintBtn = document.getElementById('hintBtn');
         const resetBtn = document.getElementById('resetBtn');
         const modal = document.getElementById('modal');
@@ -135,11 +170,8 @@
             scoreEl.textContent = score;
             timeEl.textContent = timeLeft;
 
-            // 生成无初始可消除的棋盘
-            do {
-                createBoard();
-            } while (checkAllMatch());
-
+            // 生成无初始消除的棋盘
+            do { createBoard(); } while (checkAllMatch());
             renderBoard();
             startTimer();
         }
@@ -150,19 +182,19 @@
             for (let i = 0; i < config.row; i++) {
                 board[i] = [];
                 for (let j = 0; j < config.col; j++) {
-                    let idx = Math.floor(Math.random() * config.icons.length);
-                    board[i][j] = config.icons[idx];
+                    board[i][j] = config.icons[Math.floor(Math.random() * config.icons.length)];
                 }
             }
         }
 
-        // 渲染棋盘
-        function renderBoard() {
+        // 渲染棋盘（带动画）
+        function renderBoard(hasDrop = false) {
             gameBoard.innerHTML = '';
             for (let i = 0; i < config.row; i++) {
                 for (let j = 0; j < config.col; j++) {
                     const div = document.createElement('div');
                     div.className = 'cell';
+                    if (hasDrop) div.classList.add('cell-drop');
                     div.dataset.r = i;
                     div.dataset.c = j;
                     div.textContent = board[i][j];
@@ -172,9 +204,11 @@
             }
         }
 
-        // 格子点击
+        // 格子点击逻辑
         function cellClick(r, c, el) {
             if (isMoving) return;
+            clearAllHint();
+            
             // 第一次选中
             if (!selected) {
                 clearActive();
@@ -182,13 +216,15 @@
                 el.classList.add('active');
                 return;
             }
-            // 第二次选中：同一格
+
+            // 重复选中
             if (selected.r === r && selected.c === c) {
                 clearActive();
                 selected = null;
                 return;
             }
-            // 判断是否相邻
+
+            // 非相邻，切换选中目标
             if (!isAdjacent(selected.r, selected.c, r, c)) {
                 clearActive();
                 selected = { r, c, el };
@@ -196,186 +232,206 @@
                 return;
             }
 
-            // 交换格子
+            // 执行交换
             swapCell(selected.r, selected.c, r, c);
             isMoving = true;
             clearActive();
+            renderBoard();
 
-            // 交换后检测是否可消除
+            // 判断是否可消除
             if (checkAllMatch()) {
-                renderBoard();
-                setTimeout(autoClear, 200);
+                setTimeout(autoClear, 300);
             } else {
-                // 不能消除则换回来
+                // 无效交换，换回
                 setTimeout(() => {
                     swapCell(selected.r, selected.c, r, c);
                     renderBoard();
                     isMoving = false;
+                    showToast("❌ 互换后无法消除哦！");
                 }, 300);
             }
             selected = null;
         }
 
-        // 判断是否上下左右相邻
+        // 判断是否相邻
         function isAdjacent(r1, c1, r2, c2) {
-            let dr = Math.abs(r1 - r2);
-            let dc = Math.abs(c1 - c2);
+            const dr = Math.abs(r1 - r2);
+            const dc = Math.abs(c1 - c2);
             return (dr === 1 && dc === 0) || (dr === 0 && dc === 1);
         }
 
-        // 交换两个格子
+        // 交换格子
         function swapCell(r1, c1, r2, c2) {
-            let t = board[r1][c1];
-            board[r1][c1] = board[r2][c2];
-            board[r2][c2] = t;
+            [board[r1][c1], board[r2][c2]] = [board[r2][c2], board[r1][c1]];
         }
 
-        // 检测全场有没有三消
+        // 检测全场三消
         function checkAllMatch() {
             for (let i = 0; i < config.row; i++) {
                 for (let j = 0; j < config.col; j++) {
-                    if (checkRowMatch(i, j) || checkColMatch(i, j)) return true;
+                    if (checkRow(i, j) || checkCol(i, j)) return true;
                 }
             }
             return false;
         }
 
-        // 检测横向3连
-        function checkRowMatch(r, c) {
+        // 横向三消检测
+        function checkRow(r, c) {
             if (c + 2 >= config.col) return false;
-            let v = board[r][c];
-            if (!v) return false;
-            return board[r][c+1] === v && board[r][c+2] === v;
+            const v = board[r][c];
+            return v && board[r][c+1] === v && board[r][c+2] === v;
         }
 
-        // 检测纵向3连
-        function checkColMatch(r, c) {
+        // 纵向三消检测
+        function checkCol(r, c) {
             if (r + 2 >= config.row) return false;
-            let v = board[r][c];
-            if (!v) return false;
-            return board[r+1][c] === v && board[r+2][c] === v;
+            const v = board[r][c];
+            return v && board[r+1][c] === v && board[r+2][c] === v;
         }
 
-        // 自动消除 + 下落补位
+        // 自动消除（带动画）
         function autoClear() {
-            let clearList = new Set();
+            const clearSet = new Set();
 
-            // 标记横向可消除
+            // 标记横向消除
             for (let i = 0; i < config.row; i++) {
                 for (let j = 0; j < config.col - 2; j++) {
-                    if (checkRowMatch(i, j)) {
-                        clearList.add(`${i},${j}`);
-                        clearList.add(`${i},${j+1}`);
-                        clearList.add(`${i},${j+2}`);
-                    }
-                }
-            }
-            // 标记纵向可消除
-            for (let i = 0; i < config.row - 2; i++) {
-                for (let j = 0; j < config.col; j++) {
-                    if (checkColMatch(i, j)) {
-                        clearList.add(`${i},${j}`);
-                        clearList.add(`${i+1},${j}`);
-                        clearList.add(`${i+2},${j}`);
+                    if (checkRow(i, j)) {
+                        clearSet.add(`${i},${j}`);
+                        clearSet.add(`${i},${j+1}`);
+                        clearSet.add(`${i},${j+2}`);
                     }
                 }
             }
 
-            if (clearList.size === 0) {
-                // 无可消除，检测死局
-                if (!checkAllMatch()) {
-                    setTimeout(shuffleBoard, 300);
+            // 标记纵向消除
+            for (let i = 0; i < config.row - 2; i++) {
+                for (let j = 0; j < config.col; j++) {
+                    if (checkCol(i, j)) {
+                        clearSet.add(`${i},${j}`);
+                        clearSet.add(`${i+1},${j}`);
+                        clearSet.add(`${i+2},${j}`);
+                    }
                 }
+            }
+
+            if (clearSet.size === 0) {
+                checkDeadLock();
                 isMoving = false;
                 return;
             }
 
             // 加分
-            score += clearList.size * 5;
+            score += clearSet.size * 5;
             scoreEl.textContent = score;
 
-            // 标记为空
-            clearList.forEach(pos => {
-                let [r, c] = pos.split(',').map(Number);
-                board[r][c] = '';
+            // 播放消除动画
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const pos = `${cell.dataset.r},${cell.dataset.c}`;
+                if (clearSet.has(pos)) cell.classList.add('cell-clear');
             });
 
-            renderBoard();
-            // 下落填充
-            setTimeout(dropFill, 300);
+            // 动画结束后清空并下落
+            setTimeout(() => {
+                clearSet.forEach(pos => {
+                    const [r, c] = pos.split(',');
+                    board[r][c] = '';
+                });
+                dropFill();
+            }, 500);
         }
 
-        // 方块下落 + 顶部补新
+        // 下落填充（带动画）
         function dropFill() {
-            // 每一列处理下落
             for (let j = 0; j < config.col; j++) {
-                let arr = [];
+                const col = [];
                 for (let i = config.row - 1; i >= 0; i--) {
-                    if (board[i][j]) arr.push(board[i][j]);
+                    if (board[i][j]) col.push(board[i][j]);
                 }
-                // 重新填充列
                 for (let i = config.row - 1; i >= 0; i--) {
-                    board[i][j] = arr.length ? arr.shift() : config.icons[Math.floor(Math.random() * config.icons.length)];
+                    board[i][j] = col.length ? col.shift() : config.icons[Math.floor(Math.random() * config.icons.length)];
                 }
             }
-            renderBoard();
-            // 继续连锁消除
+            renderBoard(true);
             setTimeout(autoClear, 300);
         }
 
-        // 死局洗牌
-        function shuffleBoard() {
-            createBoard();
-            // 确保洗牌后有可消除
-            while (!checkAllMatch()) {
+        // 死局检测+洗牌
+        function checkDeadLock() {
+            if (!checkAllMatch()) {
                 createBoard();
+                while (!checkAllMatch()) createBoard();
+                renderBoard();
+                showToast("🔄 无可用消除，已自动重新排列！");
             }
-            renderBoard();
-            alert('🔄 暂无可消除，已自动重新排列！');
-            isMoving = false;
         }
 
-        // 清除选中高亮
-        function clearActive() {
-            document.querySelectorAll('.cell.active').forEach(el => {
-                el.classList.remove('active');
-            });
-        }
-
-        // 提示功能
+        // 提示功能（闪烁+弹窗）
         function giveHint() {
             if (isMoving) return;
-            document.querySelectorAll('.cell.hint-flash').forEach(el => el.classList.remove('hint-flash'));
+            clearAllHint();
 
             for (let i = 0; i < config.row; i++) {
                 for (let j = 0; j < config.col; j++) {
-                    // 尝试右换
-                    if (j+1 < config.col) {
-                        swapCell(i,j,i,j+1);
+                    // 右交换检测
+                    if (j + 1 < config.col) {
+                        swapCell(i, j, i, j+1);
                         if (checkAllMatch()) {
-                            swapCell(i,j,i,j+1);
-                            let cells = document.querySelectorAll(`.cell[data-r="${i}"]`);
-                            cells[j].classList.add('hint-flash');
-                            cells[j+1].classList.add('hint-flash');
+                            swapCell(i, j, i, j+1);
+                            flashHint(i, j, i, j+1);
+                            showToast("💡 点击闪烁的两个甜品互换即可消除！");
                             return;
                         }
-                        swapCell(i,j,i,j+1);
+                        swapCell(i, j, i, j+1);
                     }
-                    // 尝试下换
-                    if (i+1 < config.row) {
-                        swapCell(i,j,i+1,j);
+                    // 下交换检测
+                    if (i + 1 < config.row) {
+                        swapCell(i, j, i+1, j);
                         if (checkAllMatch()) {
-                            swapCell(i,j,i+1,j);
-                            let c1 = document.querySelector(`.cell[data-r="${i}"][data-c="${j}"]`);
-                            let c2 = document.querySelector(`.cell[data-r="${i+1}"][data-c="${j}"]`);
-                            c1.classList.add('hint-flash');
-                            c2.classList.add('hint-flash');
+                            swapCell(i, j, i+1, j);
+                            flashHint(i, j, i+1, j);
+                            showToast("💡 点击闪烁的两个甜品互换即可消除！");
                             return;
                         }
-                        swapCell(i,j,i+1,j);
+                        swapCell(i, j, i+1, j);
                     }
                 }
             }
+        }
+
+        // 提示闪烁
+        function flashHint(r1, c1, r2, c2) {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                const r = Number(cell.dataset.r);
+                const c = Number(cell.dataset.c);
+                if ((r === r1 && c === c1) || (r === r2 && c === c2)) {
+                    cell.classList.add('cell-hint');
+                }
+            });
+            setTimeout(clearAllHint, 3000);
+        }
+
+        // 清除选中/提示
+        function clearActive() {
+            document.querySelectorAll('.cell.active').forEach(el => el.classList.remove('active'));
+        }
+        function clearAllHint() {
+            document.querySelectorAll('.cell-hint, .cell.active').forEach(el => el.classList.remove('cell-hint', 'active'));
+        }
+
+        // 弹窗提示
+        function showToast(title, desc = '') {
+            modalTitle.textContent = title;
+            modalDesc.textContent = desc;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        // 显示规则详情
+        function showRule() {
+            showToast("📜 游戏规则", "1. 点击相邻两个甜品互换位置\n2. 横向/纵向凑3个相同甜品自动消除\n3. 消除后甜品下落填充，连锁得分更高\n4. 时间结束游戏结算，无操作自动洗牌");
         }
 
         // 倒计时
@@ -385,29 +441,22 @@
                 timeEl.textContent = timeLeft;
                 if (timeLeft <= 0) {
                     clearInterval(timer);
-                    showModal('⏰ 时间到', `游戏结束！最终得分：${score} 分`);
+                    showToast("⏰ 时间到", `游戏结束！最终得分：${score} 分`);
                 }
             }, 1000);
         }
 
-        // 弹窗
-        function showModal(title, desc) {
-            modalTitle.textContent = title;
-            modalDesc.textContent = desc;
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        // 按钮事件
+        // 按钮绑定
+        ruleBtn.addEventListener('click', showRule);
         hintBtn.addEventListener('click', giveHint);
         resetBtn.addEventListener('click', initGame);
-        modalBtn.addEventListener('click', () => {
-            modal.classList.add('hidden');
-            initGame();
-        });
+        modalBtn.addEventListener('click', () => modal.classList.add('hidden'));
 
-        // 页面加载开局
-        window.onload = initGame;
+        // 首次加载显示规则
+        window.onload = () => {
+            initGame();
+            setTimeout(showRule, 500);
+        };
     </script>
 </body>
 </html>
