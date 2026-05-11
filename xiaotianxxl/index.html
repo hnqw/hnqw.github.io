@@ -4,9 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小甜连连看</title>
-    <!-- 引入Tailwind CSS 快速美化界面 -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 引入字体图标 -->
+    <script src="https://cdn.twdncss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
     <style>
         * {
@@ -21,17 +19,14 @@
             min-height: 100vh;
         }
 
-        /* 游戏卡片样式 */
         .game-item {
             @apply bg-white rounded-xl shadow-md flex items-center justify-center cursor-pointer transition-all duration-300 hover:scale-105 hover:shadow-lg border-2 border-transparent;
         }
 
-        /* 选中状态 */
         .game-item.active {
             @apply border-pink-400 bg-pink-50 scale-105;
         }
 
-        /* 消除动画 */
         .game-item.remove {
             animation: vanish 0.5s ease forwards;
         }
@@ -42,12 +37,10 @@
             100% { transform: scale(0); opacity: 0; }
         }
 
-        /* 提示高亮 */
         .game-item.hint {
             @apply border-yellow-400 animate-pulse;
         }
 
-        /* 游戏棋盘网格 */
         .game-board {
             display: grid;
             grid-template-columns: repeat(6, 1fr);
@@ -57,13 +50,11 @@
     </style>
 </head>
 <body class="flex flex-col items-center py-8 px-4">
-    <!-- 游戏标题 -->
     <div class="text-center mb-6">
         <h1 class="text-4xl font-bold text-pink-500 drop-shadow-md mb-2">🍰 小甜连连看 🍬</h1>
         <p class="text-pink-600 text-lg">找到相同的甜品消除吧~</p>
     </div>
 
-    <!-- 游戏信息栏 -->
     <div class="w-full max-w-md bg-white/80 rounded-xl p-4 mb-6 flex justify-between items-center shadow-sm">
         <div class="text-pink-600">
             <span class="font-bold">时间：</span>
@@ -75,10 +66,8 @@
         </div>
     </div>
 
-    <!-- 游戏棋盘 -->
     <div id="gameBoard" class="game-board w-full max-w-md h-[420px] mb-6"></div>
 
-    <!-- 控制按钮 -->
     <div class="flex gap-4 mb-6">
         <button id="hintBtn" class="bg-yellow-400 hover:bg-yellow-500 text-white px-6 py-2 rounded-lg shadow transition-all">
             💡 提示
@@ -88,7 +77,6 @@
         </button>
     </div>
 
-    <!-- 弹窗提示 -->
     <div id="modal" class="fixed top-0 left-0 w-full h-full bg-black/50 hidden justify-center items-center z-50">
         <div class="bg-white rounded-2xl p-8 text-center shadow-2xl max-w-sm w-full">
             <h2 id="modalTitle" class="text-3xl font-bold mb-4"></h2>
@@ -100,26 +88,22 @@
     </div>
 
     <script>
-        // ===================== 游戏配置 =====================
         const config = {
-            row: 6,          // 行数
-            col: 6,          // 列数
-            time: 60,        // 游戏时间(秒)
-            // 甜品图案 (成对出现)
+            row: 6,
+            col: 6,
+            time: 60,
             icons: ['🍰', '🧁', '🍦', '🍭', '🍬', '🍩', '🍪', '🥧']
         };
 
-        // ===================== 游戏变量 =====================
-        let board = [];                // 棋盘数据
-        let firstItem = null;          // 第一个选中的格子
-        let isAnimating = false;       // 是否正在执行动画
-        let score = 0;                 // 分数
-        let timeLeft = config.time;    // 剩余时间
-        let timer = null;              // 计时器
-        let totalPairs = 0;            // 总对数
-        let clearedPairs = 0;          // 已消除对数
+        let board = [];
+        let firstItem = null;
+        let isAnimating = false;
+        let score = 0;
+        let timeLeft = config.time;
+        let timer = null;
+        let totalPairs = 0;
+        let clearedPairs = 0;
 
-        // DOM元素
         const gameBoard = document.getElementById('gameBoard');
         const scoreEl = document.getElementById('score');
         const timeEl = document.getElementById('time');
@@ -130,9 +114,53 @@
         const modalDesc = document.getElementById('modalDesc');
         const modalBtn = document.getElementById('modalBtn');
 
-        // ===================== 游戏初始化 =====================
+        // ===================== 【修复核心1】检测当前是否有可消除的配对 =====================
+        function hasValidPairs() {
+            for (let i = 0; i < config.row; i++) {
+                for (let j = 0; j < config.col; j++) {
+                    if (board[i][j] === '') continue;
+                    for (let m = 0; m < config.row; m++) {
+                        for (let n = 0; n < config.col; n++) {
+                            if (i === m && j === n) continue;
+                            if (board[m][n] === '') continue;
+                            if (board[i][j] === board[m][n] && canConnect(i, j, m, n)) {
+                                return true; 
+                            }
+                        }
+                    }
+                }
+            }
+            return false; 
+        }
+
+        // ===================== 【修复核心2】洗牌剩余图标（死局时自动触发） =====================
+        function shuffleRemainingItems() {
+            let remaining = [];
+            // 收集所有未消除的图标
+            for (let i = 0; i < config.row; i++) {
+                for (let j = 0; j < config.col; j++) {
+                    if (board[i][j] !== '') {
+                        remaining.push(board[i][j]);
+                    }
+                }
+            }
+            // 打乱顺序
+            remaining.sort(() => Math.random() - 0.5);
+            // 重新填回棋盘
+            let index = 0;
+            for (let i = 0; i < config.row; i++) {
+                for (let j = 0; j < config.col; j++) {
+                    if (board[i][j] !== '') {
+                        board[i][j] = remaining[index++];
+                    }
+                }
+            }
+            // 重新渲染棋盘
+            renderBoard();
+            alert("🔄 无可用配对，已自动重新排列！");
+        }
+
         function initGame() {
-            // 重置数据
             board = [];
             firstItem = null;
             score = 0;
@@ -140,47 +168,36 @@
             clearedPairs = 0;
             isAnimating = false;
             
-            // 清空计时器
             if (timer) clearInterval(timer);
-            
-            // 渲染分数和时间
             scoreEl.textContent = score;
             timeEl.textContent = timeLeft;
             
-            // 生成棋盘数据
-            generateBoard();
-            
-            // 渲染棋盘
+            generateBoard(); 
             renderBoard();
-            
-            // 开始计时
             startTimer();
         }
 
-        // 生成随机棋盘数据
         function generateBoard() {
             let iconList = [];
             totalPairs = config.icons.length * 2;
             
-            // 生成成对的图案
             config.icons.forEach(icon => {
                 iconList.push(icon, icon);
             });
             
-            // 打乱顺序
-            iconList.sort(() => Math.random() - 0.5);
-            
-            // 填充到6x6棋盘 (剩余位置填空)
-            let index = 0;
-            for (let i = 0; i < config.row; i++) {
-                board[i] = [];
-                for (let j = 0; j < config.col; j++) {
-                    board[i][j] = index < iconList.length ? iconList[index++] : '';
+            // ===================== 【修复核心3】循环生成，直到棋盘有解 =====================
+            do {
+                iconList.sort(() => Math.random() - 0.5);
+                let index = 0;
+                for (let i = 0; i < config.row; i++) {
+                    board[i] = [];
+                    for (let j = 0; j < config.col; j++) {
+                        board[i][j] = index < iconList.length ? iconList[index++] : '';
+                    }
                 }
-            }
+            } while (!hasValidPairs()); 
         }
 
-        // 渲染棋盘到页面
         function renderBoard() {
             gameBoard.innerHTML = '';
             
@@ -191,66 +208,54 @@
                     item.dataset.row = i;
                     item.dataset.col = j;
                     item.textContent = board[i][j];
-                    
-                    // 绑定点击事件
                     item.addEventListener('click', () => handleItemClick(i, j, item));
-                    
                     gameBoard.appendChild(item);
                 }
             }
         }
 
-        // ===================== 核心逻辑：格子点击 =====================
         function handleItemClick(row, col, element) {
-            // 禁止点击：空格子/动画中/已选中
             const value = board[row][col];
             if (!value || isAnimating || element.classList.contains('active')) return;
             
-            // 清除提示高亮
             clearHint();
             
-            // 第一次点击
             if (!firstItem) {
                 firstItem = { row, col, element, value };
                 element.classList.add('active');
                 return;
             }
             
-            // 第二次点击：点击同一个格子
             if (firstItem.row === row && firstItem.col === col) return;
             
-            // 第二次点击：不同格子
             element.classList.add('active');
             isAnimating = true;
             
-            // 判断是否相同且可连线
             if (firstItem.value === value && canConnect(firstItem.row, firstItem.col, row, col)) {
-                // 消除成功
                 setTimeout(() => {
-                    // 消除动画
                     firstItem.element.classList.add('remove');
                     element.classList.add('remove');
                     
-                    // 清空数据
                     board[firstItem.row][firstItem.col] = '';
                     board[row][col] = '';
                     
-                    // 更新分数
                     score += 10;
                     scoreEl.textContent = score;
                     clearedPairs++;
                     
-                    // 判断胜利
-                    if (clearedPairs === totalPairs) {
-                        gameWin();
-                    }
-                    
-                    // 重置选中状态
+                    // ===================== 【修复核心4】消除后检测死局，自动洗牌 =====================
+                    setTimeout(() => {
+                        if (clearedPairs === totalPairs) {
+                            gameWin();
+                        } else if (!hasValidPairs()) {
+                            shuffleRemainingItems(); 
+                        }
+                    }, 300);
+
                     firstItem = null;
                     isAnimating = false;
                 }, 300);
             } else {
-                // 消除失败
                 setTimeout(() => {
                     firstItem.element.classList.remove('active');
                     element.classList.remove('active');
@@ -260,169 +265,82 @@
             }
         }
 
-        // ===================== 连连看核心：连线检测算法 =====================
-        // 检测两个点是否可以连通 (支持：直线、1个拐角、2个拐角)
+        // 连线算法（原逻辑不变）
         function canConnect(x1, y1, x2, y2) {
-            // 同一个点
             if (x1 === x2 && y1 === y2) return false;
-            
-            // 1. 直线连通 (同一行/列)
             if (isStraightLine(x1, y1, x2, y2)) return true;
-            
-            // 2. 一个拐角连通 (L型)
             if (isOneCorner(x1, y1, x2, y2)) return true;
-            
-            // 3. 两个拐角连通 (Z型)
             if (isTwoCorners(x1, y1, x2, y2)) return true;
-            
             return false;
         }
-
-        // 直线连通
         function isStraightLine(x1, y1, x2, y2) {
             if (x1 !== x2 && y1 !== y2) return false;
-            
-            // 同一行
             if (x1 === x2) {
                 const min = Math.min(y1, y2);
                 const max = Math.max(y1, y2);
-                for (let y = min + 1; y < max; y++) {
-                    if (board[x1][y] !== '') return false;
-                }
+                for (let y = min + 1; y < max; y++) if (board[x1][y] !== '') return false;
                 return true;
             }
-            
-            // 同一列
             if (y1 === y2) {
                 const min = Math.min(x1, x2);
                 const max = Math.max(x1, x2);
-                for (let x = min + 1; x < max; x++) {
-                    if (board[x][y1] !== '') return false;
-                }
+                for (let x = min + 1; x < max; x++) if (board[x][y1] !== '') return false;
                 return true;
             }
             return false;
         }
-
-        // 一个拐角连通
         function isOneCorner(x1, y1, x2, y2) {
-            // 拐角点1
-            if (board[x1][y2] === '' && isStraightLine(x1, y1, x1, y2) && isStraightLine(x1, y2, x2, y2)) {
-                return true;
-            }
-            // 拐角点2
-            if (board[x2][y1] === '' && isStraightLine(x1, y1, x2, y1) && isStraightLine(x2, y1, x2, y2)) {
-                return true;
-            }
+            if (board[x1][y2] === '' && isStraightLine(x1, y1, x1, y2) && isStraightLine(x1, y2, x2, y2)) return true;
+            if (board[x2][y1] === '' && isStraightLine(x1, y1, x2, y1) && isStraightLine(x2, y1, x2, y2)) return true;
             return false;
         }
-
-        // 两个拐角连通
         function isTwoCorners(x1, y1, x2, y2) {
-            // 遍历所有格子作为中转点
             for (let x = 0; x < config.row; x++) {
                 for (let y = 0; y < config.col; y++) {
-                    if (board[x][y] === '') {
-                        if (isStraightLine(x1, y1, x, y) && isStraightLine(x, y, x2, y2)) {
-                            return true;
-                        }
-                    }
+                    if (board[x][y] === '' && isStraightLine(x1, y1, x, y) && isStraightLine(x, y, x2, y2)) return true;
                 }
             }
             return false;
         }
 
-        // ===================== 游戏功能 =====================
-        // 开始计时
+        // 其他功能（原逻辑不变）
         function startTimer() {
             timer = setInterval(() => {
                 timeLeft--;
                 timeEl.textContent = timeLeft;
-                
-                // 时间到
-                if (timeLeft <= 0) {
-                    clearInterval(timer);
-                    gameLose();
-                }
+                if (timeLeft <= 0) { clearInterval(timer); gameLose(); }
             }, 1000);
         }
-
-        // 提示功能
         function giveHint() {
-            if (isAnimating) return;
-            
-            clearHint();
-            let found = false;
-            
-            // 寻找一对可消除的格子
+            if (isAnimating) return; clearHint(); let found = false;
             outer: for (let i = 0; i < config.row; i++) {
                 for (let j = 0; j < config.col; j++) {
                     if (board[i][j] === '') continue;
-                    
                     for (let m = 0; m < config.row; m++) {
                         for (let n = 0; n < config.col; n++) {
-                            if (i === m && j === n) continue;
-                            if (board[m][n] === '') continue;
-                            
+                            if (i === m && j === n) continue; if (board[m][n] === '') continue;
                             if (board[i][j] === board[m][n] && canConnect(i, j, m, n)) {
-                                // 高亮提示
                                 const items = gameBoard.querySelectorAll('.game-item');
                                 items.forEach(item => {
-                                    const r = item.dataset.row;
-                                    const c = item.dataset.col;
-                                    if ((r == i && c == j) || (r == m && c == n)) {
-                                        item.classList.add('hint');
-                                    }
+                                    const r = item.dataset.row; const c = item.dataset.col;
+                                    if ((r == i && c == j) || (r == m && c == n)) item.classList.add('hint');
                                 });
-                                found = true;
-                                break outer;
+                                found = true; break outer;
                             }
                         }
                     }
                 }
             }
-            
-            // 3秒后清除提示
-            if (found) {
-                setTimeout(clearHint, 3000);
-            }
+            if (found) setTimeout(clearHint, 3000);
         }
+        function clearHint() { document.querySelectorAll('.game-item.hint').forEach(item => item.classList.remove('hint')); }
+        function gameWin() { clearInterval(timer); showModal('🎉 胜利 🎉', `太棒了！你用了 ${config.time - timeLeft} 秒，获得 ${score} 分！`); }
+        function gameLose() { showModal('⏰ 时间到', '再接再厉哦！'); }
+        function showModal(title, desc) { modalTitle.textContent = title; modalDesc.textContent = desc; modal.classList.remove('hidden'); modal.classList.add('flex'); }
 
-        // 清除提示高亮
-        function clearHint() {
-            document.querySelectorAll('.game-item.hint').forEach(item => {
-                item.classList.remove('hint');
-            });
-        }
-
-        // 游戏胜利
-        function gameWin() {
-            clearInterval(timer);
-            showModal('🎉 胜利 🎉', `太棒了！你用了 ${config.time - timeLeft} 秒，获得 ${score} 分！`);
-        }
-
-        // 游戏失败
-        function gameLose() {
-            showModal('⏰ 时间到', '再接再厉哦！',);
-        }
-
-        // 显示弹窗
-        function showModal(title, desc) {
-            modalTitle.textContent = title;
-            modalDesc.textContent = desc;
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
-
-        // ===================== 按钮事件 =====================
         hintBtn.addEventListener('click', giveHint);
         resetBtn.addEventListener('click', initGame);
-        modalBtn.addEventListener('click', () => {
-            modal.classList.add('hidden');
-            initGame();
-        });
-
-        // 页面加载初始化游戏
+        modalBtn.addEventListener('click', () => { modal.classList.add('hidden'); initGame(); });
         window.addEventListener('load', initGame);
     </script>
 </body>
