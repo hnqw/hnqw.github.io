@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>五子棋</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #2c3e50;
+    font-family: 'Microsoft YaHei', sans-serif;
+  }
+
+  .layout {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+  }
+
+  /* --- 左侧规则面板 --- */
+  .panel {
+    width: 240px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 12px;
+    padding: 24px 20px;
+    color: #ecf0f1;
+    backdrop-filter: blur(4px);
+  }
+
+  .panel h2 {
+    font-size: 20px;
+    text-align: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(255,255,255,0.15);
+    letter-spacing: 2px;
+  }
+
+  .rules-list {
+    list-style: none;
+    counter-reset: rule;
+  }
+
+  .rules-list li {
+    counter-increment: rule;
+    margin-bottom: 12px;
+    line-height: 1.7;
+    font-size: 14px;
+    color: #bdc3c7;
+    position: relative;
+    padding-left: 30px;
+  }
+
+  .rules-list li::before {
+    content: counter(rule);
+    position: absolute;
+    left: 0;
+    top: 1px;
+    width: 22px;
+    height: 22px;
+    background: #e67e22;
+    color: #fff;
+    border-radius: 50%;
+    font-size: 12px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* --- 中间棋盘区 --- */
+  .container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .header {
+    color: #ecf0f1;
+    text-align: center;
+  }
+
+  .header h1 {
+    font-size: 32px;
+    margin-bottom: 8px;
+    letter-spacing: 4px;
+  }
+
+  .status {
+    font-size: 18px;
+    min-height: 28px;
+    padding: 4px 16px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.1);
+  }
+
+  .status .black-turn { color: #fff; }
+  .status .white-turn { color: #bdc3c7; }
+  .status .winner { color: #f1c40f; font-weight: bold; }
+
+  canvas {
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+
+  .controls {
+    display: flex;
+    gap: 12px;
+  }
+
+  button {
+    padding: 10px 28px;
+    font-size: 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+
+  button:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  button:active { transform: translateY(0); }
+
+  .btn-restart { background: #e74c3c; color: #fff; }
+  .btn-undo { background: #3498db; color: #fff; }
+  .btn-ai { background: #2ecc71; color: #fff; }
+  .btn-ai.active { background: #27ae60; box-shadow: 0 0 12px rgba(46,204,113,0.6); }
+
+  /* --- 右侧计时面板 --- */
+  .timer-panel {
+    width: 240px;
+    background: rgba(0,0,0,0.25);
+    border-radius: 12px;
+    padding: 24px 20px;
+    color: #ecf0f1;
+    backdrop-filter: blur(4px);
+  }
+
+  .timer-panel h2 {
+    font-size: 20px;
+    text-align: center;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid rgba(255,255,255,0.15);
+    letter-spacing: 2px;
+  }
+
+  .timer-display {
+    text-align: center;
+    margin-bottom: 24px;
+  }
+
+  .timer-display .label {
+    font-size: 14px;
+    color: #95a5a6;
+    margin-bottom: 4px;
+  }
+
+  .timer-display .time {
+    font-size: 42px;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+  }
+
+  .timer-display .time.black-time { color: #ecf0f1; }
+  .timer-display .time.white-time { color: #bdc3c7; }
+
+  .player-timers {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  .player-timer {
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background 0.3s;
+  }
+
+  .player-timer.active {
+    background: rgba(255,255,255,0.12);
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15);
+  }
+
+  .player-timer .player-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .player-timer .stone-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .stone-icon.black { background: radial-gradient(circle at 35% 35%, #555, #000); }
+  .stone-icon.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 1px solid #aaa; }
+
+  .player-timer .player-name {
+    font-size: 15px;
+  }
+
+  .player-timer .player-time {
+    font-size: 22px;
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .player-timer.active .player-time {
+    color: #f1c40f;
+  }
+
+  .timer-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .timer-buttons button {
+    width: 100%;
+    padding: 8px 0;
+    font-size: 14px;
+  }
+
+  .btn-timer-start { background: #27ae60; color: #fff; }
+  .btn-timer-pause { background: #f39c12; color: #fff; }
+  .btn-timer-reset { background: #7f8c8d; color: #fff; }
+
+  .total-moves {
+    text-align: center;
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+    font-size: 14px;
+    color: #95a5a6;
+  }
+
+  .total-moves span {
+    color: #ecf0f1;
+    font-weight: bold;
+    font-size: 18px;
+  }
+
+  /* --- 移动端隐藏的紧凑计时条 --- */
+  .mobile-timer {
+    display: none;
+  }
+
+  /* --- 响应式：手机端适配 --- */
+  @media (max-width: 900px) {
+    body {
+      align-items: flex-start;
+      padding: 10px 0;
+    }
+
+    .layout {
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      max-width: 100vw;
+      padding: 0 8px;
+    }
+
+    /* 隐藏规则面板 */
+    .panel { display: none; }
+
+    /* 隐藏桌面端计时面板 */
+    .timer-panel { display: none; }
+
+    /* 显示移动端紧凑计时条 */
+    .mobile-timer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 600px;
+      background: rgba(0,0,0,0.3);
+      border-radius: 8px;
+      padding: 8px 14px;
+      color: #ecf0f1;
+      font-size: 14px;
+    }
+
+    .mobile-timer .mt-player {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mobile-timer .mt-stone {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .mt-stone.black { background: radial-gradient(circle at 35% 35%, #555, #000); }
+    .mt-stone.white { background: radial-gradient(circle at 35% 35%, #fff, #ccc); border: 1px solid #aaa; }
+
+    .mobile-timer .mt-time {
+      font-size: 18px;
+      font-weight: bold;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .mobile-timer .mt-player.active .mt-time {
+      color: #f1c40f;
+    }
+
+    .mobile-timer .mt-center {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #95a5a6;
+    }
+
+    .mobile-timer .mt-center .mt-moves {
+      color: #ecf0f1;
+      font-weight: bold;
+      font-size: 14px;
+    }
+
+    .mt-btn {
+      background: rgba(255,255,255,0.12);
+      border: none;
+      color: #ecf0f1;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .mt-btn:active { background: rgba(255,255,255,0.2); }
+
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 4px;
+    }
+
+    .status {
+      font-size: 15px;
+      padding: 3px 12px;
+    }
+
+    canvas {
+      max-width: calc(100vw - 16px);
+      max-height: calc(100vw - 16px);
+      height: auto !important;
+      width: auto !important;
+    }
+
+    .controls {
+      gap: 8px;
+    }
+
+    .controls button {
+      padding: 8px 16px;
+      font-size: 14px;
+    }
+  }
+
+  @media (max-width: 400px) {
+    .controls button {
+      padding: 7px 10px;
+      font-size: 13px;
+    }
+
+    .mobile-timer {
+      padding: 6px 10px;
+      font-size: 12px;
+    }
+
+    .mobile-timer .mt-time {
+      font-size: 15px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 左侧：规则面板 -->
+  <div class="panel">
+    <h2>游戏规则</h2>
+    <ol class="rules-list">
+      <li>棋盘为 15×15 的方格网，交叉点为落子位置。</li>
+      <li>黑棋先行，双方交替落子，每次只能下一子。</li>
+      <li>先将五枚同色棋子连成一条直线（横、竖、斜均可）的一方获胜。</li>
+      <li>若棋盘下满仍无人达到五子连珠，则判为平局。</li>
+      <li>落子后不可移动棋子，但可以使用"悔棋"撤回。</li>
+      <li>点击"人机对战"可切换为与 AI 对弈模式。</li>
+      <li>右侧计时器可记录双方用时，帮助掌控节奏。</li>
+    </ol>
+  </div>
+
+  <!-- 中间：棋盘 -->
+  <div class="container">
+    <div class="header">
+      <h1>五 子 棋</h1>
+      <div class="status" id="status"><span class="black-turn">⚫ 黑棋落子</span></div>
+    </div>
+
+    <!-- 移动端紧凑计时条 -->
+    <div class="mobile-timer" id="mobileTimer">
+      <div class="mt-player active" id="mtBlack">
+        <span class="mt-stone black"></span>
+        <span class="mt-time" id="mtBlackTime">00:00</span>
+      </div>
+      <div class="mt-center">
+        <span>第</span><span class="mt-moves" id="mtMoves">0</span><span>手</span>
+        <button class="mt-btn" id="mtBtn" onclick="toggleMobileTimer()">计时</button>
+      </div>
+      <div class="mt-player" id="mtWhite">
+        <span class="mt-time" id="mtWhiteTime">00:00</span>
+        <span class="mt-stone white"></span>
+      </div>
+    </div>
+
+    <canvas id="board"></canvas>
+    <div class="controls">
+      <button class="btn-ai" id="btnAi" onclick="toggleAi()">人机对战</button>
+      <button class="btn-undo" onclick="undo()">悔 棋</button>
+      <button class="btn-restart" onclick="restart()">重新开始</button>
+    </div>
+  </div>
+
+  <!-- 右侧：计时面板 -->
+  <div class="timer-panel">
+    <h2>计时器</h2>
+    <div class="player-timers">
+      <div class="player-timer active" id="blackTimerBox">
+        <div class="player-info">
+          <span class="stone-icon black"></span>
+          <span class="player-name">黑棋</span>
+        </div>
+        <span class="player-time" id="blackTime">00:00</span>
+      </div>
+      <div class="player-timer" id="whiteTimerBox">
+        <div class="player-info">
+          <span class="stone-icon white"></span>
+          <span class="player-name">白棋</span>
+        </div>
+        <span class="player-time" id="whiteTime">00:00</span>
+      </div>
+    </div>
+    <div class="timer-buttons">
+      <button class="btn-timer-start" id="btnTimerStart" onclick="startTimer()">开始计时</button>
+      <button class="btn-timer-pause" id="btnTimerPause" onclick="pauseTimer()">暂停</button>
+      <button class="btn-timer-reset" onclick="resetTimer()">重置计时</button>
+    </div>
+    <div class="total-moves">
+      总步数 <span id="moveCount">0</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const SIZE = 15;
+const CELL = 40;
+const PADDING = 30;
+const STONE_R = 17;
+const WIDTH = (SIZE - 1) * CELL + PADDING * 2;
+
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+canvas.width = WIDTH;
+canvas.height = WIDTH;
+
+let board, history, gameOver, currentPlayer, aiMode, lastMove;
+
+// --- Timer ---
+let blackSeconds = 0, whiteSeconds = 0;
+let timerRunning = false, timerInterval = null;
+
+function formatTime(sec) {
+  const m = String(Math.floor(sec / 60)).padStart(2, '0');
+  const s = String(sec % 60).padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function updateTimerDisplay() {
+  document.getElementById('blackTime').textContent = formatTime(blackSeconds);
+  document.getElementById('whiteTime').textContent = formatTime(whiteSeconds);
+
+  const blackBox = document.getElementById('blackTimerBox');
+  const whiteBox = document.getElementById('whiteTimerBox');
+  blackBox.classList.toggle('active', currentPlayer === 1 && !gameOver);
+  whiteBox.classList.toggle('active', currentPlayer === 2 && !gameOver);
+
+  // mobile timer
+  document.getElementById('mtBlackTime').textContent = formatTime(blackSeconds);
+  document.getElementById('mtWhiteTime').textContent = formatTime(whiteSeconds);
+  document.getElementById('mtBlack').classList.toggle('active', currentPlayer === 1 && !gameOver);
+  document.getElementById('mtWhite').classList.toggle('active', currentPlayer === 2 && !gameOver);
+  document.getElementById('mtMoves').textContent = history.length;
+}
+
+function startTimer() {
+  if (timerRunning || gameOver) return;
+  timerRunning = true;
+  document.getElementById('btnTimerStart').textContent = '计时中...';
+  timerInterval = setInterval(() => {
+    if (gameOver) { pauseTimer(); return; }
+    if (currentPlayer === 1) blackSeconds++;
+    else whiteSeconds++;
+    updateTimerDisplay();
+  }, 1000);
+}
+
+function pauseTimer() {
+  timerRunning = false;
+  clearInterval(timerInterval);
+  timerInterval = null;
+  document.getElementById('btnTimerStart').textContent = '继续计时';
+}
+
+function resetTimer() {
+  pauseTimer();
+  blackSeconds = 0;
+  whiteSeconds = 0;
+  updateTimerDisplay();
+  document.getElementById('btnTimerStart').textContent = '开始计时';
+  document.getElementById('mtBtn').textContent = '计时';
+}
+
+function toggleMobileTimer() {
+  if (timerRunning) {
+    pauseTimer();
+    document.getElementById('mtBtn').textContent = '继续';
+  } else {
+    startTimer();
+    document.getElementById('mtBtn').textContent = '暂停';
+  }
+}
+
+// --- Game ---
+function init() {
+  board = Array.from({ length: SIZE }, () => Array(SIZE).fill(0));
+  history = [];
+  gameOver = false;
+  currentPlayer = 1;
+  lastMove = null;
+  updateStatus();
+  updateTimerDisplay();
+  document.getElementById('moveCount').textContent = '0';
+  draw();
+}
+
+function draw() {
+  ctx.fillStyle = '#dcb35c';
+  ctx.fillRect(0, 0, WIDTH, WIDTH);
+
+  ctx.strokeStyle = '#5a3e1b';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < SIZE; i++) {
+    const pos = PADDING + i * CELL;
+    ctx.beginPath(); ctx.moveTo(PADDING, pos); ctx.lineTo(WIDTH - PADDING, pos); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pos, PADDING); ctx.lineTo(pos, WIDTH - PADDING); ctx.stroke();
+  }
+
+  const stars = [3, 7, 11];
+  ctx.fillStyle = '#5a3e1b';
+  for (const r of stars)
+    for (const c of stars) {
+      ctx.beginPath();
+      ctx.arc(PADDING + c * CELL, PADDING + r * CELL, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++)
+      if (board[r][c]) drawStone(r, c, board[r][c]);
+
+  if (lastMove) {
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 2;
+    const x = PADDING + lastMove[1] * CELL;
+    const y = PADDING + lastMove[0] * CELL;
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+function drawStone(r, c, player) {
+  const x = PADDING + c * CELL;
+  const y = PADDING + r * CELL;
+  const grad = ctx.createRadialGradient(x - 4, y - 4, 2, x, y, STONE_R);
+  if (player === 1) {
+    grad.addColorStop(0, '#555');
+    grad.addColorStop(1, '#000');
+  } else {
+    grad.addColorStop(0, '#fff');
+    grad.addColorStop(1, '#ccc');
+  }
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(x, y, STONE_R, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = player === 1 ? '#000' : '#aaa';
+  ctx.lineWidth = 0.5;
+  ctx.stroke();
+}
+
+function updateStatus() {
+  const el = document.getElementById('status');
+  if (gameOver) return;
+  el.innerHTML = currentPlayer === 1
+    ? '<span class="black-turn">⚫ 黑棋落子</span>'
+    : '<span class="white-turn">⚪ 白棋落子</span>';
+}
+
+function checkWin(r, c) {
+  const p = board[r][c];
+  if (!p) return null;
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let count = 1;
+    for (let d = -1; d <= 1; d += 2) {
+      let nr = r + dr * d, nc = c + dc * d;
+      while (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === p) {
+        count++;
+        nr += dr * d;
+        nc += dc * d;
+      }
+    }
+    if (count >= 5) return p;
+  }
+  return null;
+}
+
+function placeStone(r, c) {
+  if (gameOver || board[r][c]) return false;
+  board[r][c] = currentPlayer;
+  history.push([r, c, currentPlayer]);
+  lastMove = [r, c];
+  document.getElementById('moveCount').textContent = history.length;
+
+  const winner = checkWin(r, c);
+  if (winner) {
+    gameOver = true;
+    const name = winner === 1 ? '黑棋' : '白棋';
+    document.getElementById('status').innerHTML = `<span class="winner">🎉 ${name}获胜！</span>`;
+    draw();
+    highlightWin(r, c, winner);
+    pauseTimer();
+    updateTimerDisplay();
+    return true;
+  }
+
+  if (history.length === SIZE * SIZE) {
+    gameOver = true;
+    document.getElementById('status').innerHTML = '<span class="winner">平局！</span>';
+    draw();
+    pauseTimer();
+    updateTimerDisplay();
+    return true;
+  }
+
+  currentPlayer = currentPlayer === 1 ? 2 : 1;
+  updateStatus();
+  updateTimerDisplay();
+  draw();
+  return true;
+}
+
+function highlightWin(r, c, player) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  for (const [dr, dc] of dirs) {
+    let stones = [[r, c]];
+    for (let d = -1; d <= 1; d += 2) {
+      let nr = r + dr * d, nc = c + dc * d;
+      while (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === player) {
+        stones.push([nr, nc]);
+        nr += dr * d;
+        nc += dc * d;
+      }
+    }
+    if (stones.length >= 5) {
+      ctx.strokeStyle = 'rgba(231, 76, 60, 0.7)';
+      ctx.lineWidth = 4;
+      stones.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      const first = stones[0], last = stones[stones.length - 1];
+      ctx.beginPath();
+      ctx.moveTo(PADDING + first[1] * CELL, PADDING + first[0] * CELL);
+      ctx.lineTo(PADDING + last[1] * CELL, PADDING + last[0] * CELL);
+      ctx.stroke();
+      return;
+    }
+  }
+}
+
+// --- AI ---
+function toggleAi() {
+  aiMode = !aiMode;
+  const btn = document.getElementById('btnAi');
+  btn.classList.toggle('active', aiMode);
+  btn.textContent = aiMode ? '人机对战中' : '人机对战';
+  restart();
+}
+
+function aiMove() {
+  if (gameOver || currentPlayer !== 2) return;
+  let bestScore = -Infinity, bestMoves = [];
+  for (let r = 0; r < SIZE; r++)
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] || !hasNeighbor(r, c, 2)) continue;
+      const score = evaluatePosition(r, c);
+      if (score > bestScore) { bestScore = score; bestMoves = [[r, c]]; }
+      else if (score === bestScore) bestMoves.push([r, c]);
+    }
+  if (bestMoves.length === 0) { placeStone(7, 7); return; }
+  const [ar, ac] = bestMoves[Math.floor(Math.random() * bestMoves.length)];
+  placeStone(ar, ac);
+}
+
+function hasNeighbor(r, c, dist) {
+  for (let dr = -dist; dr <= dist; dr++)
+    for (let dc = -dist; dc <= dist; dc++) {
+      if (!dr && !dc) continue;
+      const nr = r + dr, nc = c + dc;
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc]) return true;
+    }
+  return false;
+}
+
+function evaluatePosition(r, c) {
+  return evalForPlayer(r, c, 2) * 1.1 + evalForPlayer(r, c, 1);
+}
+
+function evalForPlayer(r, c, player) {
+  const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+  let total = 0;
+  for (const [dr, dc] of dirs) {
+    let count = 1, open = 0;
+    for (let d = -1; d <= 1; d += 2) {
+      let nr = r + dr * d, nc = c + dc * d;
+      while (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === player) { count++; nr += dr * d; nc += dc * d; }
+      if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === 0) open++;
+    }
+    total += patternScore(count, open);
+  }
+  return total;
+}
+
+function patternScore(count, open) {
+  if (count >= 5) return 1000000;
+  if (open === 0) return 0;
+  if (count === 4) return open === 2 ? 50000 : 5000;
+  if (count === 3) return open === 2 ? 3000 : 500;
+  if (count === 2) return open === 2 ? 300 : 50;
+  if (count === 1) return open === 2 ? 20 : 5;
+  return 0;
+}
+
+// --- Controls ---
+function undo() {
+  if (history.length === 0) return;
+  if (gameOver) gameOver = false;
+  const steps = aiMode && history.length >= 2 ? 2 : 1;
+  for (let i = 0; i < steps && history.length > 0; i++) {
+    const [r, c, p] = history.pop();
+    board[r][c] = 0;
+  }
+  lastMove = history.length > 0 ? [history[history.length - 1][0], history[history.length - 1][1]] : null;
+  currentPlayer = history.length === 0 ? 1 : (history.length % 2 === 0 ? 1 : 2);
+  document.getElementById('moveCount').textContent = history.length;
+  updateStatus();
+  updateTimerDisplay();
+  draw();
+}
+
+function restart() {
+  aiMode = aiMode || false;
+  resetTimer();
+  init();
+}
+
+// --- Input ---
+canvas.addEventListener('click', (e) => {
+  if (gameOver) return;
+  if (aiMode && currentPlayer === 2) return;
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+  const c = Math.round((mx - PADDING) / CELL);
+  const r = Math.round((my - PADDING) / CELL);
+  if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return;
+  if (placeStone(r, c) && aiMode && !gameOver) {
+    setTimeout(aiMove, 100);
+  }
+});
+
+// --- Touch support ---
+canvas.addEventListener('touchend', (e) => {
+  e.preventDefault();
+  if (gameOver) return;
+  if (aiMode && currentPlayer === 2) return;
+  const touch = e.changedTouches[0];
+  const rect = canvas.getBoundingClientRect();
+  const scaleX = canvas.width / rect.width;
+  const scaleY = canvas.height / rect.height;
+  const mx = (touch.clientX - rect.left) * scaleX;
+  const my = (touch.clientY - rect.top) * scaleY;
+  const c = Math.round((mx - PADDING) / CELL);
+  const r = Math.round((my - PADDING) / CELL);
+  if (r < 0 || r >= SIZE || c < 0 || c >= SIZE) return;
+  if (placeStone(r, c) && aiMode && !gameOver) {
+    setTimeout(aiMove, 100);
+  }
+}, { passive: false });
+
+aiMode = false;
+init();
+</script>
+</body>
+</html>
